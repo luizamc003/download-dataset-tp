@@ -54,22 +54,25 @@ if __name__ == '__main__':
     link_completo = None
 
     while soup.find('a', class_="right carousel-control") != None:
-        diagnostico, id  = extrair_dados_paciente(soup)
-        print(id)
-        if diagnostico == "Healthy" or diagnostico == "Sick":    
-            banco_img = soup.find_all('a', attrs={'target': '_blank'})
-            cont = 0
-            for elemento in banco_img:
-                link = elemento.get('href')
-                print(link)
-                if link.endswith('.txt'):  # Verifica se o link termina com .txt
-                    link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
-                    baixar_arquivo(link_completo, diagnostico, id, cont)
-                    cont = cont + 1
+            diagnostico, id  = extrair_dados_paciente(soup)
+            print(id)
+            if diagnostico == "Healthy" or diagnostico == "Sick":    
+                #encontrando as divs com as imagens
+                banco_img = soup.find('div', class_='imagenspaciente').find_next('div', class_='imagenspaciente')
+                banco_img = banco_img.find_all('a')
+                cont = 0
+                for elemento in banco_img:
+                    link = elemento.get('href')
+                    print(link)
+                    if link.endswith('.txt'):  # Verifica se o link termina com .txt
+                        link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
+                        baixar_arquivo(link_completo, diagnostico, id, cont)
+                        cont = cont + 1
 
-        #achando o link da proxima pagina
-        next_page = soup.find('a', class_="right carousel-control")
-        next_page_link = "http://visual.ic.uff.br/dmi/prontuario/" + next_page.get('href')
-        driver.get(next_page_link)
-        page_content = driver.page_source
-        soup = BeautifulSoup(page_content, 'html.parser')
+            #achando o link da proxima pagina
+            next_page = soup.find('a', class_="right carousel-control")
+            next_page_link = "http://visual.ic.uff.br/dmi/prontuario/" + next_page.get('href')
+            driver.get(next_page_link)
+            page_content = driver.page_source
+            soup = BeautifulSoup(page_content, 'html.parser')
+    
