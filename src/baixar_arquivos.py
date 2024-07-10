@@ -19,7 +19,14 @@ import os
 """
 def baixar_arquivo(url, destino, id_paciente, descricao_img):
     descricao_img = descricao_img.replace(" ", "")
-    endereco_destino = "output/" + destino +"/" + id_paciente + "_img_"+ descricao_img + ".txt"
+    base_destino = "output/" + destino +"/" + id_paciente + "_img_"+ descricao_img
+    endereco_destino = base_destino + ".txt"
+    
+    #verificar se o arquivo já existe (mais de uma foto por posição)
+    contador = 1
+    while os.path.exists(endereco_destino):
+        endereco_destino = f"{base_destino}_{contador}.txt"
+        contador += 1
     
     resposta = requests.get(url, verify=False)
     
@@ -61,21 +68,20 @@ if __name__ == '__main__':
     link_completo = None
 
     while soup.find('a', class_="right carousel-control") != None:
+            #completar função
             diagnostico, id  = extrair_dados_paciente(soup)
-            print(id)
-            if diagnostico == "Healthy" or diagnostico == "Sick":    
-                #encontrando as divs com as imagens
-                banco_img = soup.find('div', class_='imagenspaciente').find_next('div', class_='imagenspaciente')
-                #caso não tenha imagens
-                if banco_img != None:
-                    banco_img = banco_img.find_all('a')
-                    cont = 0
-                    for elemento in banco_img:
-                        link = elemento.get('href')
-                        if link.endswith('.txt'):  # Verifica se o link termina com .txt
-                            link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
-                            baixar_arquivo(link_completo, diagnostico, id, str(elemento.get('title')))
-                            cont = cont + 1
+            #encontrando as divs com as imagens
+            banco_img = soup.find('div', class_='imagenspaciente').find_next('div', class_='imagenspaciente')
+            #caso não tenha imagens
+            if banco_img != None:
+                banco_img = banco_img.find_all('a')
+                cont = 0
+                for elemento in banco_img:
+                    link = elemento.get('href')
+                    if link.endswith('.txt'):  # Verifica se o link termina com .txt
+                        link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
+                        baixar_arquivo(link_completo, diagnostico, id, str(elemento.get('title')))
+                        cont = cont + 1
 
             #achando o link da proxima pagina
             next_page = soup.find('a', class_="right carousel-control")
