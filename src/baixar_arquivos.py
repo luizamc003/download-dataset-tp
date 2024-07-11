@@ -38,19 +38,20 @@ def baixar_arquivo(url, destino, id_paciente, descricao_img):
 
 """ 
     Extrai ID e diagnóstico do paciente
+    Params:
+    soup: objeto BeautifulSoup da div que contém a visita em análise
 """
-def extrair_dados_paciente(soup):
+def extrair_diagnostico(soup):
     condition_bs4 = soup.find_all('p', class_='view-diagnostico')
     condition = condition_bs4[0].text
     condition = condition.split(':')[1].strip()
     
-    id_paciente_bs4 = soup.find('p', class_='titulo2').text
-    id_paciente = id_paciente_bs4.split(':')[1].strip()
-    
-    return condition, id_paciente    
+    return condition 
 
 """
     Extrai dados do paciente: ID, Record, Age, Date of registration, Marital status and Race
+    Params:
+    soup: objeto BeautifulSoup da página 
 """
 def extrair_dados_id(soup):
     personal_data = soup.find('div', class_='perfiluser')
@@ -83,6 +84,8 @@ def extrair_dados_id(soup):
 
 """
     Extrai data das visitas no formato: YYYY-MM-DD
+    Params:
+    soup: objeto BeautifulSoup da div que contém a data
 """
 def extrair_data_visita(soup):
     data = soup.find('label', attrs={'for': 'q2'})
@@ -92,15 +95,34 @@ def extrair_data_visita(soup):
     data_formated = datetime.datetime.strptime(data_match, '%B %dth, %Y').date()
     return data_formated
 
+""" 
+    Extrai histórico pessoal do paciente
+    Params:
+    soup: objeto BeautifulSoup da página, div que contém histórico pessoal (descripction1)
+    completar função
+"""
+def extrair_personal_history(soup):
+    personal_history = soup.find('p')
+    print(personal_history)
+    
+
 def extrair_dados_exames(soup):
     pattern = re.compile(r'exame-termico\d+')
     # Utiliza uma função lambda para verificar se o id da tag corresponde ao padrão regex
     visits = soup.find(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
-    extrair_data_visita(visits)
     
-    #while visits != None:
-    
-    
+    #contador para saber quantas visitas o paciente fez
+    cont = 1
+    while visits != None:
+        data = extrair_data_visita(visits)
+        print(data)
+        diagnotico = extrair_diagnostico(visits)
+        print(diagnotico)
+        
+        #completar função
+        extrair_personal_history(visits.find('div', class_='descripcion1'))
+        
+        visits = visits.find_next(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
 
 if __name__ == '__main__':
     
@@ -120,7 +142,6 @@ if __name__ == '__main__':
     page_content = driver.page_source
     soup = BeautifulSoup(page_content, 'html.parser')
     
-    extrair_dados_exames(soup)
     link_completo = None
 
     while soup.find('a', class_="right carousel-control") != None:
