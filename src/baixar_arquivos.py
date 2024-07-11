@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from urllib.parse import urljoin
 import os
 import re
+import datetime
 
 """ 
     Baixa o arquivo na pasta de acordo com o diagnóstico do paciente
@@ -80,6 +81,27 @@ def extrair_dados_id(soup):
     
     return id_paciente    
 
+"""
+    Extrai data das visitas no formato: YYYY-MM-DD
+"""
+def extrair_data_visita(soup):
+    data = soup.find('label', attrs={'for': 'q2'})
+    pattern = re.compile(r'\w+ \d+th, \d{4}')
+    data_match = pattern.search(data.text).group()
+    
+    data_formated = datetime.datetime.strptime(data_match, '%B %dth, %Y').date()
+    return data_formated
+
+def extrair_dados_exames(soup):
+    pattern = re.compile(r'exame-termico\d+')
+    # Utiliza uma função lambda para verificar se o id da tag corresponde ao padrão regex
+    visits = soup.find(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
+    extrair_data_visita(visits)
+    
+    #while visits != None:
+    
+    
+
 if __name__ == '__main__':
     
     #acessando página inicial para fazer login
@@ -92,12 +114,13 @@ if __name__ == '__main__':
     password.send_keys("")
     driver.find_element(By.TAG_NAME, 'button').click()
         
-    url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=13'
+    url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=198'
     driver.get(url) 
     
     page_content = driver.page_source
     soup = BeautifulSoup(page_content, 'html.parser')
     
+    extrair_dados_exames(soup)
     link_completo = None
 
     while soup.find('a', class_="right carousel-control") != None:
