@@ -7,6 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from urllib.parse import urljoin
 import os
+import re
 
 """ 
     Baixa o arquivo na pasta de acordo com o diagnóstico do paciente
@@ -45,7 +46,39 @@ def extrair_dados_paciente(soup):
     id_paciente_bs4 = soup.find('p', class_='titulo2').text
     id_paciente = id_paciente_bs4.split(':')[1].strip()
     
-    return condition, id_paciente
+    return condition, id_paciente    
+
+"""
+    Extrai dados do paciente: ID, Record, Age, Date of registration, Marital status and Race
+"""
+def extrair_dados_id(soup):
+    personal_data = soup.find('div', class_='perfiluser')
+    
+    #extraindo ID
+    id_paciente = personal_data.find('p', class_='titulo2').text.split(':')[1].strip()
+
+    record, age, date_reg, marital_status, race = None, None, None, None, None
+    #extraindo informações em 'p'
+    description = personal_data.find_all('p')
+    for attribute in description:
+        if 'Record' in attribute.text:
+            record = attribute.text.split(':')[1].strip()
+            print(record)
+        elif 'years old' in attribute.text:
+            pattern = re.compile(r'\d+')
+            age = pattern.search(attribute.text).group()
+            print(age)
+        elif 'Registered' in attribute.text:
+            pattern = re.compile(r'\d{4}-\d{2}-\d{2}')
+            date_reg = pattern.search(attribute.text).group()
+            print(date_reg)
+        elif 'Marital status' in attribute.text and 'Race' in attribute.text:
+            marital_status = attribute.text.split('.')[0].strip().split(':')[1].strip()
+            print(marital_status)
+            race = attribute.text.split('.')[1].strip().split(':')[1].strip()
+            print(race)
+    
+    return id_paciente    
 
 if __name__ == '__main__':
     
@@ -59,7 +92,7 @@ if __name__ == '__main__':
     password.send_keys("")
     driver.find_element(By.TAG_NAME, 'button').click()
         
-    url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=1'
+    url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=13'
     driver.get(url) 
     
     page_content = driver.page_source
