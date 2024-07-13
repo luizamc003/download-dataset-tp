@@ -107,16 +107,13 @@ def extrair_personal_data(soup):
     print(titulo)
 
     for info in dado[1:]:
-        if info.text.contains(':'):
-            label = info.text.split(':')[0].replace('-', "").strip()
-            value = info.text.split(':')[1].strip()
-            print(label)
-            print(value)
-        if info.text.contains('?'):
-            label = info.text.split('?')[0].replace('-', "").strip()
-            value = info.text.split('?')[1].strip()
-            print(label)
-            print(value)
+        sep_txt = ':' if ':' in info.text else '?'
+        data_patient = info.text.replace('-', "").split(sep_txt, 1)
+        label = data_patient[0]
+        value = data_patient[1] if len(data_patient) > 1 else ""
+        print(label)
+        print(value)
+    
             
 
 def extrair_dados_exames(soup):
@@ -130,8 +127,8 @@ def extrair_dados_exames(soup):
         data = extrair_data_visita(visits)
         print(data)
         #completar funcao ->guardar o diagnostico final de acordo com a data do arquivo txt
-        diagnotico = extrair_diagnostico(visits)
-        print(diagnotico)
+        diagnostico = extrair_diagnostico(visits)
+        print(diagnostico)
         
         #completar função
         extrair_personal_data(visits.find('div', class_='descripcion1'))
