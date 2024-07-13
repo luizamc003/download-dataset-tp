@@ -99,8 +99,9 @@ def extrair_data_visita(soup):
     Extrai histórico  do paciente
     Params:
     soup: objeto BeautifulSoup da página, div que contém histórico pessoal (descripctions)
-    completar função
+    
 """
+#TO DO: completar função para guardar os dados em arquivo
 def extrair_personal_data(soup):    
     dado = soup.find_all('p')
     titulo = dado[0].text.strip()
@@ -113,22 +114,32 @@ def extrair_personal_data(soup):
         value = data_patient[1] if len(data_patient) > 1 else ""
         print(label)
         print(value)
-    
-            
 
+#TO DO: passar a data para outra função e identificar o diagnóstico da foto
+def extrair_data_foto(link):
+    pattern = re.compile(r'\w+ \d+th, \d{4}')
+    data_match = pattern.search(link).group()
+
+""" 
+    Obter os dadsos de cada visita, guardando data e diagnóstico em um map
+    Params:
+    soup: objeto do BS4 da página
+"""
+#TO DO: completar a função para guardar os dados em arquivo
 def extrair_dados_exames(soup):
     pattern = re.compile(r'exame-termico\d+')
     # Utiliza uma função lambda para verificar se o id da tag corresponde ao padrão regex
     visits = soup.find(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
-    
-    #contador para saber quantas visitas o paciente fez -> guardar cada visita
-    cont = 1
+    # guardar a data com o diagnostico de cada visita
+    visitas_diagnostico = {}
     while visits != None:
         data = extrair_data_visita(visits)
         print(data)
         #completar funcao ->guardar o diagnostico final de acordo com a data do arquivo txt
         diagnostico = extrair_diagnostico(visits)
         print(diagnostico)
+        
+        visitas_diagnostico[data] = diagnostico
         
         #completar função
         extrair_personal_data(visits.find('div', class_='descripcion1'))
@@ -137,8 +148,9 @@ def extrair_dados_exames(soup):
         
         visits = visits.find_next(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
 
-    return diagnostico
+    return visitas_diagnostico
 
+#TO DO: juntar as funções de identificar data da foto e diagnóstico de acordo com as datas das consultas
 if __name__ == '__main__':
     
     #acessando página inicial para fazer login
@@ -157,7 +169,6 @@ if __name__ == '__main__':
     page_content = driver.page_source
     soup = BeautifulSoup(page_content, 'html.parser')
     
-    extrair_dados_exames(soup)
     link_completo = None
 
     while soup.find('a', class_="right carousel-control") != None:
@@ -173,6 +184,7 @@ if __name__ == '__main__':
                 for elemento in banco_img:
                     link = elemento.get('href')
                     if link.endswith('.txt'):  # Verifica se o link termina com .txt
+                        extrair_data_foto(link)
                         link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
                         baixar_arquivo(link_completo, diagnostico, id, str(elemento.get('title')))
                         cont = cont + 1
