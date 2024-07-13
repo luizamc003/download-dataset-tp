@@ -96,33 +96,51 @@ def extrair_data_visita(soup):
     return data_formated
 
 """ 
-    Extrai histórico pessoal do paciente
+    Extrai histórico  do paciente
     Params:
-    soup: objeto BeautifulSoup da página, div que contém histórico pessoal (descripction1)
+    soup: objeto BeautifulSoup da página, div que contém histórico pessoal (descripctions)
     completar função
 """
-def extrair_personal_history(soup):
-    personal_history = soup.find('p')
-    print(personal_history)
-    
+def extrair_personal_data(soup):    
+    dado = soup.find_all('p')
+    titulo = dado[0].text.strip()
+    print(titulo)
+
+    for info in dado[1:]:
+        if info.text.contains(':'):
+            label = info.text.split(':')[0].replace('-', "").strip()
+            value = info.text.split(':')[1].strip()
+            print(label)
+            print(value)
+        if info.text.contains('?'):
+            label = info.text.split('?')[0].replace('-', "").strip()
+            value = info.text.split('?')[1].strip()
+            print(label)
+            print(value)
+            
 
 def extrair_dados_exames(soup):
     pattern = re.compile(r'exame-termico\d+')
     # Utiliza uma função lambda para verificar se o id da tag corresponde ao padrão regex
     visits = soup.find(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
     
-    #contador para saber quantas visitas o paciente fez
+    #contador para saber quantas visitas o paciente fez -> guardar cada visita
     cont = 1
     while visits != None:
         data = extrair_data_visita(visits)
         print(data)
+        #completar funcao ->guardar o diagnostico final de acordo com a data do arquivo txt
         diagnotico = extrair_diagnostico(visits)
         print(diagnotico)
         
         #completar função
-        extrair_personal_history(visits.find('div', class_='descripcion1'))
+        extrair_personal_data(visits.find('div', class_='descripcion1'))
+        extrair_personal_data(visits.find('div', class_='descripcion2'))
+        extrair_personal_data(visits.find('div', class_='descripcion3'))
         
         visits = visits.find_next(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
+
+    return diagnostico
 
 if __name__ == '__main__':
     
@@ -142,11 +160,13 @@ if __name__ == '__main__':
     page_content = driver.page_source
     soup = BeautifulSoup(page_content, 'html.parser')
     
+    extrair_dados_exames(soup)
     link_completo = None
 
     while soup.find('a', class_="right carousel-control") != None:
             #completar função
-            diagnostico, id  = extrair_dados_paciente(soup)
+            id = extrair_dados_id(soup)
+            diagnostico = extrair_dados_exames(soup)
             #encontrando as divs com as imagens
             banco_img = soup.find('div', class_='imagenspaciente').find_next('div', class_='imagenspaciente')
             #caso não tenha imagens
@@ -166,4 +186,5 @@ if __name__ == '__main__':
             driver.get(next_page_link)
             page_content = driver.page_source
             soup = BeautifulSoup(page_content, 'html.parser')
+
     
