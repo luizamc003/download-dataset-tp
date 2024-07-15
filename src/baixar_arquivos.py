@@ -56,31 +56,33 @@ def extrair_diagnostico(soup):
 def extrair_dados_id(soup):
     personal_data = soup.find('div', class_='perfiluser')
     
+    dicio_paciente = {}
+    
     #extraindo ID
     id_paciente = personal_data.find('p', class_='titulo2').text.split(':')[1].strip()
+    dicio_paciente['id'] = id_paciente
 
-    record, age, date_reg, marital_status, race = None, None, None, None, None
     #extraindo informações em 'p'
     description = personal_data.find_all('p')
     for attribute in description:
         if 'Record' in attribute.text:
             record = attribute.text.split(':')[1].strip()
-            print(record)
+            dicio_paciente['record'] = record
         elif 'years old' in attribute.text:
             pattern = re.compile(r'\d+')
             age = pattern.search(attribute.text).group()
-            print(age)
+            dicio_paciente['idade'] = age
         elif 'Registered' in attribute.text:
             pattern = re.compile(r'\d{4}-\d{2}-\d{2}')
             date_reg = pattern.search(attribute.text).group()
-            print(date_reg)
+            dicio_paciente['registro'] = date_reg
         elif 'Marital status' in attribute.text and 'Race' in attribute.text:
             marital_status = attribute.text.split('.')[0].strip().split(':')[1].strip()
-            print(marital_status)
             race = attribute.text.split('.')[1].strip().split(':')[1].strip()
-            print(race)
+            dicio_paciente['estado-civil'] = marital_status
+            dicio_paciente['raça'] = race
     
-    return id_paciente    
+    return dicio_paciente
 
 """
     Extrai data das visitas no formato: YYYY-MM-DD
@@ -100,10 +102,12 @@ def extrair_data_visita(soup):
     Params:
     soup: objeto BeautifulSoup da página, div que contém histórico pessoal (descripctions)
     
+    return: dicionario de dados do paciente
+    
 """
-#TO DO: completar função para guardar os dados em arquivo
-def extrair_personal_data(soup):    
+def extrair_personal_data(soup, dic_paciente):    
     dado = soup.find_all('p')
+    #tirar
     titulo = dado[0].text.strip()
     print(titulo)
 
@@ -112,45 +116,61 @@ def extrair_personal_data(soup):
         data_patient = info.text.replace('-', "").split(sep_txt, 1)
         label = data_patient[0]
         value = data_patient[1] if len(data_patient) > 1 else ""
+        
+        #guardando a info dentro do dicionario de visita do paciente
+        dic_paciente[label] = value
+        
         print(label)
         print(value)
+    
 
-#TO DO: passar a data para outra função e identificar o diagnóstico da foto
 def extrair_data_foto(link):
     pattern = re.compile(r'\w+ \d+th, \d{4}')
     data_match = pattern.search(link).group()
+    return data_match
 
 """ 
     Obter os dadsos de cada visita, guardando data e diagnóstico em um map
     Params:
     soup: objeto do BS4 da página
 """
-#TO DO: completar a função para guardar os dados em arquivo
 def extrair_dados_exames(soup):
+    #dicionário com as info do id do paciente
+    paciente = extrair_dados_id(soup)
+    
     pattern = re.compile(r'exame-termico\d+')
     # Utiliza uma função lambda para verificar se o id da tag corresponde ao padrão regex
     visits = soup.find(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
-    # guardar a data com o diagnostico de cada visita
-    visitas_diagnostico = {}
+    
+    #vai ser criado outro dicionário dentro do dicio de id para cada visita
     while visits != None:
+        #guardar as informações de cada visita
+        visitas_diagnostico = {}
         data = extrair_data_visita(visits)
-        print(data)
-        #completar funcao ->guardar o diagnostico final de acordo com a data do arquivo txt
-        diagnostico = extrair_diagnostico(visits)
-        print(diagnostico)
-        
-        visitas_diagnostico[data] = diagnostico
-        
+        visitas_diagnostico['diagnostico'] = extrair_diagnostico(visits)
+                
         #completar função
-        extrair_personal_data(visits.find('div', class_='descripcion1'))
-        extrair_personal_data(visits.find('div', class_='descripcion2'))
-        extrair_personal_data(visits.find('div', class_='descripcion3'))
+        extrair_personal_data(visits.find('div', class_='descripcion1'), visitas_diagnostico)
+        extrair_personal_data(visits.find('div', class_='descripcion2'), visitas_diagnostico)
+        extrair_personal_data(visits.find('div', class_='descripcion3'), visitas_diagnostico)
+        
+        paciente[data] = visitas_diagnostico
         
         visits = visits.find_next(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
 
-    return visitas_diagnostico
+    
+    return paciente
 
-#TO DO: juntar as funções de identificar data da foto e diagnóstico de acordo com as datas das consultas
+""" 
+    Guardar os dados no csv
+    Params:
+    pacientes_dic: dicionário de pacientes, cada um com um subdicio de cada visita
+"""
+def armazenar_dados_csv(pacientes_dic):
+    campos_unicos = set(['id', 'record', 'idade', 'registro', 'estado-civil', 'raça'])
+    
+    
+    
 if __name__ == '__main__':
     
     #acessando página inicial para fazer login
@@ -170,11 +190,14 @@ if __name__ == '__main__':
     soup = BeautifulSoup(page_content, 'html.parser')
     
     link_completo = None
+    primeira_iteracao = True #variavel de controle
+    pacientes_dic = {} #dicionario de dados dos pacientes para colocar no csv
+    cont = 0
 
     while soup.find('a', class_="right carousel-control") != None:
             #completar função
-            id = extrair_dados_id(soup)
-            diagnostico = extrair_dados_exames(soup)
+            dados_paciente = extrair_dados_exames(soup)
+            diagnostico = None
             #encontrando as divs com as imagens
             banco_img = soup.find('div', class_='imagenspaciente').find_next('div', class_='imagenspaciente')
             #caso não tenha imagens
@@ -184,11 +207,19 @@ if __name__ == '__main__':
                 for elemento in banco_img:
                     link = elemento.get('href')
                     if link.endswith('.txt'):  # Verifica se o link termina com .txt
-                        extrair_data_foto(link)
+                        
+                        #extrair o dianostico correto
+                        if primeira_iteracao:
+                            data = extrair_data_foto(link)
+                            diagnostico = dados_paciente.get(data)['diagnostico']
+                            primeira_iteracao = False
+                            
                         link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
                         baixar_arquivo(link_completo, diagnostico, id, str(elemento.get('title')))
                         cont = cont + 1
 
+            pacientes_dic[cont] = dados_paciente
+            cont += 1
             #achando o link da proxima pagina
             next_page = soup.find('a', class_="right carousel-control")
             next_page_link = "http://visual.ic.uff.br/dmi/prontuario/" + next_page.get('href')
