@@ -91,10 +91,21 @@ def extrair_dados_id(soup):
 """
 def extrair_data_visita(soup):
     data = soup.find('label', attrs={'for': 'q2'})
-    pattern = re.compile(r'\w+ \d+th, \d{4}')
-    data_match = pattern.search(data.text).group()
+    # Atualizado para capturar "st", "nd", "rd", e "th"
+    pattern = re.compile(r'(\w+ \d+)(st|nd|rd|th), (\d{4})')
     
-    data_formated = datetime.datetime.strptime(data_match, '%B %dth, %Y').date().isoformat()
+    if pattern.search(data.text) == None:
+        return 'NA'
+    
+    data_match = pattern.search(data.text).group()
+    print(data_match)
+    
+    data_match = re.sub(r'(?<=\d)(st|nd|rd|th)', '', data_match)
+    print(data_match)
+    
+    # Converter para datetime e formatar
+    data_formated = datetime.datetime.strptime(data_match, '%B %d, %Y').date().isoformat()
+    print(data_formated)
     return data_formated
 
 """ 
@@ -136,13 +147,17 @@ def extrair_personal_data(soup, dic_paciente):
 def extrair_diagnostico_foto(banco, paciente):
     pattern = re.compile(r'\d{4}-\d{2}-\d{2}')
     
-    for banco_img in banco:
-        #caso não tenha imagens
-        if banco_img != None:
-            link = banco_img.find('a').get('href') if banco_img.find('a') != None else ""
-            if link.endswith('.txt'):  # Verifica se o link termina com .txt    
-                data_match = pattern.search(link).group()
-                return paciente[data_match].get('diagnostico')
+    try:    
+        for banco_img in banco:
+            #caso não tenha imagens
+            if banco_img != None:
+                link = banco_img.find('a').get('href') if banco_img.find('a') != None else ""
+                if link.endswith('.txt'):  # Verifica se o link termina com .txt    
+                    
+                    data_match = pattern.search(link).group()
+                    return paciente[data_match].get('diagnostico')
+    except KeyError:
+        return "NA"
 
 """ 
     Obter os dadsos de cada visita, guardando data e diagnóstico em um map
@@ -183,6 +198,17 @@ def extrair_dados_exames(soup):
 def armazenar_dados_csv(pacientes_dic):
     campos_unicos = set(['id', 'record', 'idade', 'registro', 'estado-civil', 'raça'])
     
+""" 
+    Função para acessar a próxima página
+"""
+def next_page(soup):
+    next_page = soup.find('a', class_="right carousel-control")
+    next_page_link = "http://visual.ic.uff.br/dmi/prontuario/" + next_page.get('href')
+    driver.get(next_page_link)
+    page_content = driver.page_source
+    soup = BeautifulSoup(page_content, 'html.parser')
+    return soup
+
 if __name__ == '__main__':
     
     #acessando página inicial para fazer login
@@ -195,7 +221,7 @@ if __name__ == '__main__':
     password.send_keys("")
     driver.find_element(By.TAG_NAME, 'button').click()
         
-    url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=198'
+    url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=346'
     driver.get(url) 
     
     page_content = driver.page_source
@@ -204,15 +230,27 @@ if __name__ == '__main__':
     link_completo = None
     primeira_iteracao = True #variavel de controle
     pacientes_dic = {} #dicionario de dados dos pacientes para colocar no csv
+    id_problemas = [] #lista de ids que deram problema
     cont = 0
+    
 
     while soup.find('a', class_="right carousel-control") != None:
             #completar função
             dados_paciente = extrair_dados_exames(soup)
             #encontrando as divs com as imagens
             banco = soup.find_all('div', class_='imagenspaciente')
+            if banco == []:
+                soup = next_page(soup)
+                continue
+            
             diagnostico = extrair_diagnostico_foto(banco, dados_paciente)
-            print(diagnostico)
+            
+            #problema com diagnóstico
+            if diagnostico == 'NA':
+                id_problemas.append(dados_paciente['id'])
+                soup = next_page(soup)
+                continue
+                            
             #laço para encontrar a div com os arquivos txt
             for banco_img in banco:
                 #caso não tenha imagens
@@ -223,14 +261,11 @@ if __name__ == '__main__':
                         if link.endswith('.txt'):  # Verifica se o link termina com .txt    
                             link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
                             baixar_arquivo(link_completo, diagnostico, dados_paciente['id'], str(elemento.get('title')))
-
+            
+            print(dados_paciente['id'])
             pacientes_dic[cont] = dados_paciente
             cont += 1
             #achando o link da proxima pagina
-            next_page = soup.find('a', class_="right carousel-control")
-            next_page_link = "http://visual.ic.uff.br/dmi/prontuario/" + next_page.get('href')
-            driver.get(next_page_link)
-            page_content = driver.page_source
-            soup = BeautifulSoup(page_content, 'html.parser')
+            soup = next_page(soup)
 
     
