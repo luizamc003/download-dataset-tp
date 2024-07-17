@@ -21,7 +21,7 @@ import datetime
 """
 def baixar_arquivo(url, destino, id_paciente, descricao_img):
     descricao_img = descricao_img.replace(" ", "")
-    base_destino = "output/" + destino +"/" + id_paciente + "_img_"+ descricao_img
+    base_destino = "output/" + destino +"/" + str(id_paciente) + "_img_"+ descricao_img
     endereco_destino = base_destino + ".txt"
     
     #verificar se o arquivo já existe (mais de uma foto por posição)
@@ -45,7 +45,7 @@ def extrair_diagnostico(soup):
     condition_bs4 = soup.find_all('p', class_='view-diagnostico')
     condition = condition_bs4[0].text
     condition = condition.split(':')[1].strip()
-    
+        
     return condition 
 
 """
@@ -94,7 +94,7 @@ def extrair_data_visita(soup):
     pattern = re.compile(r'\w+ \d+th, \d{4}')
     data_match = pattern.search(data.text).group()
     
-    data_formated = datetime.datetime.strptime(data_match, '%B %dth, %Y').date()
+    data_formated = datetime.datetime.strptime(data_match, '%B %dth, %Y').date().isoformat()
     return data_formated
 
 """ 
@@ -105,29 +105,44 @@ def extrair_data_visita(soup):
     return: dicionario de dados do paciente
     
 """
-def extrair_personal_data(soup, dic_paciente):    
-    dado = soup.find_all('p')
-    #tirar
-    titulo = dado[0].text.strip()
-    print(titulo)
+def extrair_personal_data(soup, dic_paciente):
+    elementos = soup.find_all(['p', 'span'])  # Encontra todos os elementos <p> e <span>
 
-    for info in dado[1:]:
-        sep_txt = ':' if ':' in info.text else '?'
-        data_patient = info.text.replace('-', "").split(sep_txt, 1)
-        label = data_patient[0]
-        value = data_patient[1] if len(data_patient) > 1 else ""
-        
-        #guardando a info dentro do dicionario de visita do paciente
+    for elem in elementos:
+        label, value = "", ""
+        if elem.name == 'p' and elem.find('span'):  # Se o elemento é um <p> que contém <span>
+            info = elem.text.strip().split("?", 1) if "?" in elem.text else elem.text.strip().split(":", 1)
+            label = info[0].strip()
+            value = info[1].strip() if len(info) > 1 else ""
+            continue
+        elif elem.name == 'span':  # Se o elemento é um <span>
+            label = elem.text.strip()
+            value = elem.next_sibling.strip() if elem.next_sibling else ""
+        elif elem.name == 'p':
+            info = elem.text.strip().split("?", 1) if "?" in elem.text else elem.text.strip().split(":", 1)
+            label = info[0].strip()
+            value = info[1].strip() if len(info) > 1 else ""
+
+        label = label.replace('-', "").strip().lower() if "-" in label else label.strip().lower()
+        value = value.strip().lower() if value != '' else value
         dic_paciente[label] = value
-        
-        print(label)
-        print(value)
     
-
-def extrair_data_foto(link):
-    pattern = re.compile(r'\w+ \d+th, \d{4}')
-    data_match = pattern.search(link).group()
-    return data_match
+""" 
+    Extrair diagnóstico de acordo com a data das fotos (no link .txt)
+    Params:
+    banco: lista de divs com todas as imagens do site, sendo elas .jpg ou .txt
+    paciente: dicionário de dados do paciente para extrair o diagnóstico de acordo com a data da foto
+"""
+def extrair_diagnostico_foto(banco, paciente):
+    pattern = re.compile(r'\d{4}-\d{2}-\d{2}')
+    
+    for banco_img in banco:
+        #caso não tenha imagens
+        if banco_img != None:
+            link = banco_img.find('a').get('href') if banco_img.find('a') != None else ""
+            if link.endswith('.txt'):  # Verifica se o link termina com .txt    
+                data_match = pattern.search(link).group()
+                return paciente[data_match].get('diagnostico')
 
 """ 
     Obter os dadsos de cada visita, guardando data e diagnóstico em um map
@@ -157,7 +172,6 @@ def extrair_dados_exames(soup):
         paciente[data] = visitas_diagnostico
         
         visits = visits.find_next(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
-
     
     return paciente
 
@@ -168,8 +182,6 @@ def extrair_dados_exames(soup):
 """
 def armazenar_dados_csv(pacientes_dic):
     campos_unicos = set(['id', 'record', 'idade', 'registro', 'estado-civil', 'raça'])
-    
-    
     
 if __name__ == '__main__':
     
@@ -197,26 +209,20 @@ if __name__ == '__main__':
     while soup.find('a', class_="right carousel-control") != None:
             #completar função
             dados_paciente = extrair_dados_exames(soup)
-            diagnostico = None
             #encontrando as divs com as imagens
-            banco_img = soup.find('div', class_='imagenspaciente').find_next('div', class_='imagenspaciente')
-            #caso não tenha imagens
-            if banco_img != None:
-                banco_img = banco_img.find_all('a')
-                cont = 0
-                for elemento in banco_img:
-                    link = elemento.get('href')
-                    if link.endswith('.txt'):  # Verifica se o link termina com .txt
-                        
-                        #extrair o dianostico correto
-                        if primeira_iteracao:
-                            data = extrair_data_foto(link)
-                            diagnostico = dados_paciente.get(data)['diagnostico']
-                            primeira_iteracao = False
-                            
-                        link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
-                        baixar_arquivo(link_completo, diagnostico, id, str(elemento.get('title')))
-                        cont = cont + 1
+            banco = soup.find_all('div', class_='imagenspaciente')
+            diagnostico = extrair_diagnostico_foto(banco, dados_paciente)
+            print(diagnostico)
+            #laço para encontrar a div com os arquivos txt
+            for banco_img in banco:
+                #caso não tenha imagens
+                if banco_img != None:
+                    banco_img = banco_img.find_all('a')
+                    for elemento in banco_img:
+                        link = elemento.get('href')
+                        if link.endswith('.txt'):  # Verifica se o link termina com .txt    
+                            link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
+                            baixar_arquivo(link_completo, diagnostico, dados_paciente['id'], str(elemento.get('title')))
 
             pacientes_dic[cont] = dados_paciente
             cont += 1
