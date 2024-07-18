@@ -19,9 +19,9 @@ import datetime
     id_paciente: id do paciente
     descricao_img: descrição da imagem/ posição da foto no corpo do paciente
 """
-def baixar_arquivo(url, destino, id_paciente, descricao_img):
+def baixar_arquivo(url, destino, id_paciente, descricao_img, data):
     descricao_img = descricao_img.replace(" ", "")
-    base_destino = "output/" + destino +"/" + str(id_paciente) + "_img_"+ descricao_img
+    base_destino = "output/" + destino +"/" + str(id_paciente) + "_img_"+ descricao_img + "_" + data
     endereco_destino = base_destino + ".txt"
     
     #verificar se o arquivo já existe (mais de uma foto por posição)
@@ -166,25 +166,25 @@ def extrair_diagnostico_foto(banco, paciente):
 """
 def extrair_dados_exames(soup):
     #dicionário com as info do id do paciente
-    paciente = extrair_dados_id(soup)
+    paciente = extrair_dados_id(soup) # Retorna Dicio_paciente = {'id': '', 'record': '', 'idade': '', 'registro': '', 'estado-civil': '', 'raça': ''} => PerfilUser
     
     pattern = re.compile(r'exame-termico\d+')
     # Utiliza uma função lambda para verificar se o id da tag corresponde ao padrão regex
-    visits = soup.find(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
+    visits = soup.find(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id'))) # Encontra a primeira visita < Poderia ser um Find_ALL para retornar uma lista de visitas ? >
     
     #vai ser criado outro dicionário dentro do dicio de id para cada visita
     while visits != None:
         #guardar as informações de cada visita
-        visitas_diagnostico = {}
+        visitas_diagnostico = {} 
         data = extrair_data_visita(visits)
         visitas_diagnostico['diagnostico'] = extrair_diagnostico(visits)
                 
-        #completar função
+        #completar função !!!!
         extrair_personal_data(visits.find('div', class_='descripcion1'), visitas_diagnostico)
         extrair_personal_data(visits.find('div', class_='descripcion2'), visitas_diagnostico)
         extrair_personal_data(visits.find('div', class_='descripcion3'), visitas_diagnostico)
         
-        paciente[data] = visitas_diagnostico
+        paciente[data] = visitas_diagnostico 
         
         visits = visits.find_next(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
     
@@ -217,8 +217,8 @@ if __name__ == '__main__':
     username = driver.find_element(By.ID, "usuario")
     password = driver.find_element(By.ID, "password")
     #dados
-    username.send_keys("")
-    password.send_keys("")
+    username.send_keys("Joaoaugusto")
+    password.send_keys("HegAQdyDWUSQ8i7")
     driver.find_element(By.TAG_NAME, 'button').click()
         
     url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=346'
@@ -234,15 +234,17 @@ if __name__ == '__main__':
     cont = 0
     
 
-    while soup.find('a', class_="right carousel-control") != None:
-            #completar função
-            dados_paciente = extrair_dados_exames(soup)
+    while soup.find('a', class_="right carousel-control") != None: # Enquanto houver próxima página
+            # Retorna Dicio_paciente = {'id': '', 'record': '', 'idade': '', 'registro': '', 'estado-civil': '', 'raça': '', 'data_visita': {'diagnostico': '', 'descricao': '', 'descricao2': '', 'descricao3': ''}}
+            dados_paciente = extrair_dados_exames(soup) 
             #encontrando as divs com as imagens
+            
             banco = soup.find_all('div', class_='imagenspaciente')
             if banco == []:
                 soup = next_page(soup)
                 continue
             
+            # Obtém a data de cada foto e verifica o diagnóstico correspondente em dados_paciente
             diagnostico = extrair_diagnostico_foto(banco, dados_paciente)
             
             #problema com diagnóstico
@@ -252,6 +254,8 @@ if __name__ == '__main__':
                 continue
                             
             #laço para encontrar a div com os arquivos txt
+            pattern = re.compile(r'\d{4}-\d{2}-\d{2}')
+
             for banco_img in banco:
                 #caso não tenha imagens
                 if banco_img != None:
@@ -259,8 +263,11 @@ if __name__ == '__main__':
                     for elemento in banco_img:
                         link = elemento.get('href')
                         if link.endswith('.txt'):  # Verifica se o link termina com .txt    
+                            
+                            data_match = pattern.search(link).group()
+                            diagnostico = dados_paciente[data_match].get('diagnostico')
                             link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
-                            baixar_arquivo(link_completo, diagnostico, dados_paciente['id'], str(elemento.get('title')))
+                            baixar_arquivo(link_completo, diagnostico, dados_paciente['id'], str(elemento.get('title')), data_match)
             
             print(dados_paciente['id'])
             pacientes_dic[cont] = dados_paciente
