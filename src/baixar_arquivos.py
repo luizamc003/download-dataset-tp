@@ -200,6 +200,8 @@ def armazenar_dados_csv(pacientes_dic):
     
 """ 
     Função para acessar a próxima página
+    Params:
+    soup: objeto do BS4 da página
 """
 def next_page(soup):
     next_page = soup.find('a', class_="right carousel-control")
@@ -209,6 +211,11 @@ def next_page(soup):
     soup = BeautifulSoup(page_content, 'html.parser')
     return soup
 
+def guardar_problemas(id_problemas):
+    with open('output/id_problemas.txt', 'a') as arquivo:
+        for id in id_problemas:
+            arquivo.write(f"{id}\n")
+
 if __name__ == '__main__':
     
     #acessando página inicial para fazer login
@@ -217,8 +224,8 @@ if __name__ == '__main__':
     username = driver.find_element(By.ID, "usuario")
     password = driver.find_element(By.ID, "password")
     #dados
-    username.send_keys("Joaoaugusto")
-    password.send_keys("HegAQdyDWUSQ8i7")
+    username.send_keys("")
+    password.send_keys("")
     driver.find_element(By.TAG_NAME, 'button').click()
         
     url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=346'
@@ -232,7 +239,6 @@ if __name__ == '__main__':
     pacientes_dic = {} #dicionario de dados dos pacientes para colocar no csv
     id_problemas = [] #lista de ids que deram problema
     cont = 0
-    
 
     while soup.find('a', class_="right carousel-control") != None: # Enquanto houver próxima página
             # Retorna Dicio_paciente = {'id': '', 'record': '', 'idade': '', 'registro': '', 'estado-civil': '', 'raça': '', 'data_visita': {'diagnostico': '', 'descricao': '', 'descricao2': '', 'descricao3': ''}}
@@ -274,5 +280,7 @@ if __name__ == '__main__':
             cont += 1
             #achando o link da proxima pagina
             soup = next_page(soup)
+    
+    guardar_problemas(id_problemas)
 
     
