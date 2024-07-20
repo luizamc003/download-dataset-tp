@@ -156,8 +156,9 @@ def extrair_diagnostico_foto(banco, paciente):
                     
                     data_match = pattern.search(link).group()
                     return paciente[data_match].get('diagnostico')
-    except KeyError:
-        return "NA"
+    except Exception as e:
+        guardar_problemas(paciente['id'], "Funcao extrair_diagnostico_foto - Datas incompatíveis")
+        raise
 
 """ 
     Obter os dadsos de cada visita, guardando data e diagnóstico em um map
@@ -173,22 +174,28 @@ def extrair_dados_exames(soup):
     visits = soup.find(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id'))) # Encontra a primeira visita < Poderia ser um Find_ALL para retornar uma lista de visitas ? >
     
     #vai ser criado outro dicionário dentro do dicio de id para cada visita
-    while visits != None:
-        #guardar as informações de cada visita
-        visitas_diagnostico = {} 
-        data = extrair_data_visita(visits)
-        visitas_diagnostico['diagnostico'] = extrair_diagnostico(visits)
-                
-        #completar função !!!!
-        extrair_personal_data(visits.find('div', class_='descripcion1'), visitas_diagnostico)
-        extrair_personal_data(visits.find('div', class_='descripcion2'), visitas_diagnostico)
-        extrair_personal_data(visits.find('div', class_='descripcion3'), visitas_diagnostico)
+    try:
+        while visits != None:
+            #guardar as informações de cada visita
+            visitas_diagnostico = {} 
+            data = extrair_data_visita(visits)
+            visitas_diagnostico['diagnostico'] = extrair_diagnostico(visits)
+                    
+            #completar função !!!!
+            extrair_personal_data(visits.find('div', class_='descripcion1'), visitas_diagnostico)
+            extrair_personal_data(visits.find('div', class_='descripcion2'), visitas_diagnostico)
+            extrair_personal_data(visits.find('div', class_='descripcion3'), visitas_diagnostico)
+            
+            paciente[data] = visitas_diagnostico 
+            
+            visits = visits.find_next(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
         
-        paciente[data] = visitas_diagnostico 
+        return paciente
+    except Exception as e:
+        print(f"Erro ao extrair dados da visita: {e}")
+        guardar_problemas(paciente['id'], "Erro ao extrair dados da visita - funcao extrair_dados_exames")
+        raise 
         
-        visits = visits.find_next(lambda tag: tag.name == 'section' and tag.get('id') and pattern.match(tag.get('id')))
-    
-    return paciente
 
 """ 
     Guardar os dados no csv
@@ -211,10 +218,9 @@ def next_page(soup):
     soup = BeautifulSoup(page_content, 'html.parser')
     return soup
 
-def guardar_problemas(id_problemas):
+def guardar_problemas(id_problemas, problema):
     with open('output/id_problemas.txt', 'a') as arquivo:
-        for id in id_problemas:
-            arquivo.write(f"{id}\n")
+        arquivo.write(f"{id_problemas}: {problema}\n")
 
 if __name__ == '__main__':
     
@@ -228,7 +234,7 @@ if __name__ == '__main__':
     password.send_keys("")
     driver.find_element(By.TAG_NAME, 'button').click()
         
-    url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=346'
+    url = 'http://visual.ic.uff.br/dmi/prontuario/details.php?id=1'
     driver.get(url) 
     
     page_content = driver.page_source
@@ -242,20 +248,35 @@ if __name__ == '__main__':
 
     while soup.find('a', class_="right carousel-control") != None: # Enquanto houver próxima página
             # Retorna Dicio_paciente = {'id': '', 'record': '', 'idade': '', 'registro': '', 'estado-civil': '', 'raça': '', 'data_visita': {'diagnostico': '', 'descricao': '', 'descricao2': '', 'descricao3': ''}}
-            dados_paciente = extrair_dados_exames(soup) 
+            try:
+                dados_paciente = extrair_dados_exames(soup) 
+            except Exception as e:
+                soup = next_page(soup)
+                continue
             #encontrando as divs com as imagens
+
+            if dados_paciente['id'] == '1' and  not primeira_iteracao:
+                print("idx 1 : BREAK")
+                break
+            
+            primeira_iteracao = False
             
             banco = soup.find_all('div', class_='imagenspaciente')
             if banco == []:
+                guardar_problemas(dados_paciente['id'], "banco vazio")
                 soup = next_page(soup)
                 continue
             
             # Obtém a data de cada foto e verifica o diagnóstico correspondente em dados_paciente
-            diagnostico = extrair_diagnostico_foto(banco, dados_paciente)
-            
+            try:
+                diagnostico = extrair_diagnostico_foto(banco, dados_paciente)
+            except Exception as e:
+                soup = next_page(soup)
+                continue
             #problema com diagnóstico
-            if diagnostico == 'NA':
-                id_problemas.append(dados_paciente['id'])
+            
+            if diagnostico == 'Unknown' or diagnostico == None:
+                guardar_problemas(dados_paciente['id'], "Diagnóstico Unknown / No image")
                 soup = next_page(soup)
                 continue
                             
@@ -266,21 +287,19 @@ if __name__ == '__main__':
                 #caso não tenha imagens
                 if banco_img != None:
                     banco_img = banco_img.find_all('a')
-                    for elemento in banco_img:
-                        link = elemento.get('href')
-                        if link.endswith('.txt'):  # Verifica se o link termina com .txt    
-                            
-                            data_match = pattern.search(link).group()
-                            diagnostico = dados_paciente[data_match].get('diagnostico')
-                            link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
-                            baixar_arquivo(link_completo, diagnostico, dados_paciente['id'], str(elemento.get('title')), data_match)
+                    if banco_img != None:
+                        for elemento in banco_img:
+                            link = elemento.get('href')
+                            if link.endswith('.txt'):  # Verifica se o link termina com .txt    
+                                data_match = pattern.search(link).group()
+                                diagnostico = dados_paciente[data_match].get('diagnostico')
+                                link_completo = urljoin("https://visual.ic.uff.br/dmi/bancovl/", link)  # Constrói o URL completo
+                                #baixar_arquivo(link_completo, diagnostico, dados_paciente['id'], str(elemento.get('title')), data_match)
             
             print(dados_paciente['id'])
             pacientes_dic[cont] = dados_paciente
             cont += 1
             #achando o link da proxima pagina
             soup = next_page(soup)
-    
-    guardar_problemas(id_problemas)
 
     

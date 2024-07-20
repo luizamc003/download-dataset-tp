@@ -1,1 +1,29 @@
 Pacientes com problemas:
+77: Diagn�stico Unknown / No image
+167: Diagn�stico Unknown / No image
+214: banco vazio
+215: banco vazio
+247: Diagn�stico Unknown / No image
+248: Diagn�stico Unknown / No image
+249: Diagn�stico Unknown / No image
+250: Diagn�stico Unknown / No image
+251: Diagn�stico Unknown / No image
+252: Diagn�stico Unknown / No image
+253: Diagn�stico Unknown / No image
+254: Diagn�stico Unknown / No image
+275: Diagn�stico Unknown / No image
+279: Diagn�stico Unknown / No image
+282: Funcao extrair_diagnostico_foto - Datas incompat�veis
+285: Funcao extrair_diagnostico_foto - Datas incompat�veis
+287: Funcao extrair_diagnostico_foto - Datas incompat�veis
+292: banco vazio
+293: banco vazio
+300: banco vazio
+302: banco vazio
+303: banco vazio
+304: banco vazio
+307: banco vazio
+317: banco vazio
+340: banco vazio
+351: banco vazio
+420: banco vazio
