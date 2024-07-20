@@ -27,3 +27,6 @@ Pacientes com problemas:
 340: banco vazio
 351: banco vazio
 420: banco vazio
+112: link errado
+11: link errado
+400'static45': link errado
